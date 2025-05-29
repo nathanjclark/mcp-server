@@ -4,6 +4,7 @@ use sqlx::PgPool;
 mod auth;
 mod database;
 mod mcp;
+mod registries;
 mod tools;
 
 #[shuttle_runtime::main]

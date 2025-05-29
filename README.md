@@ -1,350 +1,339 @@
-# Shuttle MCP Server Template
+# Shuttle MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server template built with Rust, Axum, and Shuttle. This template provides OAuth 2.1 authentication via Auth0, a PostgreSQL database, AI tool integration with OpenAI, and a complete MCP JSON-RPC 2.0 implementation.
+A complete [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server built with Rust, Axum, and Shuttle. This template provides everything you need to build a production-ready MCP server with OAuth 2.1 authentication, database integration, AI tools, and a clean registry-based architecture.
 
-## Features
+## 🚀 What You Get
 
-- 🔐 **OAuth 2.1 Authentication** - Secure user authentication via Auth0 with Google login
-- 🗄️ **PostgreSQL Database** - Managed database with automatic migrations via Shuttle
-- 🤖 **AI Tool Integration** - OpenAI-powered completion and summarization tools via the `rig` crate
-- 📊 **Database Tools** - Built-in user statistics and data management tools
-- 🔧 **Text Processing Tools** - Length calculation, transformation, and search utilities
-- ⚡ **JSON-RPC 2.0** - Complete MCP protocol implementation with dynamic tool registry
-- 🚀 **Shuttle Deployment** - One-command deployment to the cloud
-- 🛡️ **Secure Sessions** - JWT-based session management with HttpOnly cookies
+- **🔐 OAuth 2.1 Authentication** - Secure user authentication via Auth0 with Google login
+- **🗄️ PostgreSQL Database** - Managed database with automatic migrations  
+- **🤖 AI Integration** - OpenAI-powered tools via the `rig` crate
+- **📊 Built-in Tools** - Text processing, database queries, timestamps, and more
+- **🔧 Registry System** - Centralized management of tools, resources, and prompts
+- **⚡ Full MCP Compliance** - Complete JSON-RPC 2.0 implementation with proper authentication
+- **🚀 One-Click Deploy** - Deploy to Shuttle with a single command
+- **🛡️ Production Ready** - JWT sessions, security best practices, comprehensive error handling
 
-## Quick Start
+## 🏗️ Architecture Overview
 
-### Prerequisites
+This server implements the complete MCP specification with authentication:
 
-1. Install [Rust](https://rustup.rs/)
-2. Install [Shuttle CLI](https://docs.shuttle.rs/getting-started/installation):
+```
+┌─────────────────┐    JSON-RPC 2.0     ┌─────────────────┐
+│   MCP Client    │ ────────────────────▶│  Shuttle MCP    │
+│ (Claude, etc.)  │                      │     Server      │
+│                 │ ◄──── Tools ─────────│                 │
+│                 │ ◄── Resources ───────│  🔐 OAuth 2.1   │
+│                 │ ◄─── Prompts ────────│  🗄️ PostgreSQL  │
+└─────────────────┘                      │  🤖 AI Tools    │
+                                         └─────────────────┘
+```
+
+### Authentication Flow
+
+- **Public Methods**: `initialize`, `notifications/initialized`, `exit` 
+- **Protected Methods**: All tools, resources, and prompts require authentication
+- **Security**: Users authenticate via OAuth 2.1 before accessing any functionality
+
+## 📋 Prerequisites
+
+1. **Rust** - [Install from rustup.rs](https://rustup.rs/)
+2. **Shuttle CLI** - Recommended installation method:
    ```bash
-   cargo install cargo-shuttle
+   # Linux/macOS
+   curl -sSfL https://www.shuttle.dev/install | bash
+   
+   # Windows (PowerShell)
+   # iwr https://www.shuttle.dev/install-win | iex
+   
+   # Alternative: Using Cargo
+   # cargo install cargo-shuttle
    ```
-3. Create a [Shuttle account](https://shuttle.rs/)
-4. Create an [Auth0 account](https://auth0.com/)
+3. **Auth0 Account** - [Free at auth0.com](https://auth0.com/)
 
-### Local Development
+## 🚀 Quick Start
 
-1. **Clone this template:**
-   ```bash
-   git clone <your-repo-url>
-   cd mcp-server
-   ```
+### 1. Clone and Setup
 
-2. **Set up Auth0:**
-   - Create a new Application (Regular Web App) in your Auth0 dashboard
-   - Enable Google social connection (or other providers)
-   - Note your Auth0 domain, client ID, and client secret
+```bash
+git clone <your-repo-url>
+cd mcp-server
+```
 
-3. **Create local secrets file:**
-   ```bash
-   # Create Secrets.toml in the project root
-   touch Secrets.toml
-   ```
+### 2. Configure Auth0
 
-4. **Configure secrets:**
-   ```toml
-   # Secrets.toml
-   AUTH0_DOMAIN = 'your-tenant.auth0.com'
-   AUTH0_CLIENT_ID = 'your-client-id'
-   AUTH0_CLIENT_SECRET = 'your-client-secret'
-   AUTH0_CALLBACK_URL = 'http://localhost:8000/auth/callback'
-   SESSION_JWT_SECRET = 'your-very-long-random-secret-key-at-least-32-chars'
-   OPENAI_API_KEY = 'sk-your-openai-api-key'  # Optional: for AI tools
-   ```
+1. Create a new **Application** (Regular Web App) in Auth0
+2. Enable **Google Social Connection** 
+3. Note your domain, client ID, and client secret
 
-5. **Run locally:**
-   ```bash
-   cargo shuttle run
-   ```
+### 3. Create Secrets
 
-6. **Test the server:**
-   - Visit `http://localhost:8000/auth/login` to test authentication
-   - Test MCP endpoint: `POST http://localhost:8000/mcp` with JSON-RPC requests
-   - Example MCP request:
-     ```json
-     {
-       "jsonrpc": "2.0",
-       "method": "list_tools",
-       "id": 1
-     }
-     ```
+```bash
+# Create Secrets.toml in project root
+cat > Secrets.toml << EOF
+AUTH0_DOMAIN = 'your-tenant.auth0.com'
+AUTH0_CLIENT_ID = 'your-client-id'
+AUTH0_CLIENT_SECRET = 'your-client-secret'
+AUTH0_CALLBACK_URL = 'http://localhost:8000/auth/callback'
+SESSION_JWT_SECRET = 'your-very-long-random-secret-key-at-least-32-chars'
+OPENAI_API_KEY = 'sk-your-openai-api-key'  # Optional
+EOF
+```
 
-### Cloud Deployment
+### 4. Run Locally
 
-1. **Login to Shuttle:**
-   ```bash
-   cargo shuttle login
-   ```
+```bash
+shuttle run
+```
 
-2. **Create a new project:**
-   ```bash
-   cargo shuttle project new --name your-mcp-server
-   ```
+### 5. Test Your Server
 
-3. **Update Auth0 settings:**
-   - In your Auth0 application settings:
-   - Set Allowed Callback URLs to: `https://your-mcp-server.shuttleapp.rs/auth/callback`
-   - Set Allowed Logout URLs to: `https://your-mcp-server.shuttleapp.rs/`
+```bash
+# Test authentication
+curl http://localhost:8000/auth/login
 
-4. **Deploy:**
-   ```bash
-   cargo shuttle deploy
-   ```
+# Test MCP endpoint (initialize is public)
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test-client", "version": "1.0.0"}
+    },
+    "id": 1
+  }'
+```
 
-5. **Set production secrets:**
-   ```bash
-   # Update your Secrets.toml with production URLs
-   AUTH0_CALLBACK_URL = 'https://your-mcp-server.shuttleapp.rs/auth/callback'
-   # Keep other secrets the same
-   ```
+## 🌐 Deploy to Production
 
-6. **Redeploy with updated secrets:**
-   ```bash
-   cargo shuttle deploy
-   ```
+### 1. Setup Shuttle
 
-## Available Endpoints
+```bash
+shuttle login
+```
+
+### 2. Update Auth0 Settings
+
+In your Auth0 application:
+- **Allowed Callback URLs**: `https://your-mcp-server.shuttleapp.rs/auth/callback`
+- **Allowed Logout URLs**: `https://your-mcp-server.shuttleapp.rs/`
+
+### 3. Update Production Secrets
+
+```toml
+# Update Secrets.toml
+AUTH0_CALLBACK_URL = 'https://your-mcp-server.shuttleapp.rs/auth/callback'
+# Keep other secrets the same
+```
+
+### 4. Deploy
+
+```bash
+shuttle deploy
+```
+
+## 🔌 API Endpoints
 
 ### Authentication
-- `GET /auth/login` - Initiate OAuth login flow
-- `GET /auth/callback` - OAuth callback handler
-- `GET /auth/me` - Get current user info (requires authentication)
+- `GET /auth/login` - Start OAuth flow
+- `GET /auth/callback` - OAuth callback 
+- `GET /auth/me` - Get current user (authenticated)
 - `GET /auth/logout` - Logout and clear session
-- `GET /welcome` - Welcome page after successful login
+- `GET /welcome` - Welcome page after login
 
 ### MCP Protocol
-- `POST /mcp` - Main MCP JSON-RPC 2.0 endpoint (`initialize` and notifications are public, all other methods require authentication)
+- `POST /mcp` - Main MCP JSON-RPC 2.0 endpoint
 
-## Available MCP Tools
+## 🛠️ Available MCP Capabilities
 
-All tools follow the official MCP JSON-RPC 2.0 specification and support proper initialization:
+### Core Protocol Methods
 
-### Core MCP Methods
-- `initialize` - Initialize the MCP connection and exchange capabilities
-- `notifications/initialized` - Acknowledge successful initialization
+| Method | Authentication | Description |
+|--------|---------------|-------------|
+| `initialize` | ❌ Public | Exchange capabilities and server info |
+| `notifications/initialized` | ❌ Public | Complete MCP handshake |
+| `tools/list` | ✅ Required | List available tools with schemas |
+| `tools/call` | ✅ Required | Execute tools |
+| `resources/list` | ✅ Required | List available data resources |
+| `resources/read` | ✅ Required | Read resource content |
+| `prompts/list` | ✅ Required | List available prompt templates |
+| `prompts/get` | ✅ Required | Get specific prompts |
 
-### Tool Management
-- `tools/list` - List all available tools with full JSON schemas
-- `tools/call` - Execute tools using the standard MCP format with proper response structure
+### Built-in Tools
 
-### Resource Management
-- `resources/list` - List available data resources
-- `resources/read` - Read resource content by URI
+| Tool | Description | Arguments |
+|------|-------------|-----------|
+| `text_length` | Get character count | `text: string` |
+| `text_transform` | Transform text case | `text: string, transform: enum` |
+| `text_search` | Search for patterns | `text: string, pattern: string` |
+| `timestamp` | Get current UTC time | None |
+| `ai_complete` | Complete text prompts | `prompt: string` |
+| `ai_summarize` | Summarize long text | `text: string` |
+| `user_stats` | Get database statistics | None |
 
-### Prompt Management
-- `prompts/list` - List available prompt templates
-- `prompts/get` - Get specific prompt with arguments
+### Built-in Resources
 
-### Available Tools (via `tools/call`)
-- `text_length` - Get character count of text
-- `text_transform` - Transform text (uppercase, lowercase, titlecase)
-- `text_search` - Search for patterns in text
-- `timestamp` - Get current UTC timestamp
-- `ai_complete` - Complete text prompts using GPT (requires OpenAI API key)
-- `ai_summarize` - Summarize long text content (requires OpenAI API key)
-- `user_stats` - Get user statistics from the database
+| Resource | Description | Content Type |
+|----------|-------------|--------------|
+| `user://stats` | User statistics from database | `application/json` |
 
-### Available Resources (via `resources/read`)
-- `user://stats` - Current user statistics in JSON format
+### Built-in Prompts
 
-### Available Prompts (via `prompts/get`)
-- `code_review` - Generate code review prompts (arguments: `code`, `language`)
-- `explain_error` - Generate error explanation prompts (arguments: `error`)
+| Prompt | Description | Arguments |
+|--------|-------------|-----------|
+| `code_review` | Generate code review prompts | `code: string, language?: string` |
+| `explain_error` | Generate error explanation prompts | `error: string` |
 
-## MCP Protocol Implementation
+## 🔧 Extending Your Server
 
-This server implements the complete MCP JSON-RPC 2.0 specification with **mandatory authentication** for most operations:
+### Adding New Tools
 
-### Authentication Requirements (Per MCP Specification)
+1. **Implement the tool** in `src/tools/`:
 
-- **Public Methods (No Authentication Required):**
-  - `initialize` - Used for initial MCP handshake and capability exchange
-  - `notifications/initialized` - Acknowledges successful initialization
-  - `exit` - Client exit notification
-
-- **Protected Methods (Authentication Required):**
-  - `tools/list` - List all available tools
-  - `tools/call` - Execute any tool
-  - `resources/list` - List available data resources  
-  - `resources/read` - Read resource content
-  - `prompts/list` - List available prompt templates
-  - `prompts/get` - Get specific prompts
-
-**Authentication Process:**
-1. Users must first authenticate via the OAuth 2.1 flow at `/auth/login`
-2. Successful authentication creates a secure session JWT cookie
-3. All protected MCP method calls must include this session cookie
-4. Unauthenticated requests to protected methods return JSON-RPC error code -32001
-
-This authentication requirement ensures that only authorized users can access your tools, data resources, and prompts while maintaining the standard MCP initialization flow for client compatibility.
-
-### Initialization Flow
-1. Client sends `initialize` request with protocol version and capabilities (no auth required)
-2. Server responds with server info and supported capabilities
-3. Client sends `notifications/initialized` to complete handshake (no auth required)
-4. Client must authenticate user via OAuth flow before calling any protected methods
-5. All subsequent tool/resource/prompt operations require valid session authentication
-
-### Example MCP Requests
-
-**Initialize the connection (public):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "initialize", 
-  "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {},
-    "clientInfo": {"name": "test-client", "version": "1.0.0"}
-  },
-  "id": 0
-}
-```
-
-**List available tools (requires authentication):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/list",
-  "id": 1
-}
-```
-
-**Call a tool (requires authentication):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "text_length",
-    "arguments": {"text": "Hello world"}
-  },
-  "id": 2
-}
-```
-
-**Read a resource (requires authentication):**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "resources/read",
-  "params": {"uri": "user://stats"},
-  "id": 3
-}
-```
-
-**Note:** All requests except `initialize` and notifications must include a valid session cookie obtained through the OAuth 2.1 authentication flow.
-
-## How the OAuth 2.1 Flow Works
-
-- This server is deployed on Shuttle and exposes MCP tools and endpoints.
-- When an MCP client (e.g., Cursor, Claude, custom LLM agent) connects and needs to authenticate a user, it will redirect the user to `/auth/login`.
-- The user logs in with Google (or other provider) via Auth0.
-- On success, Auth0 redirects back to `/auth/callback`, which issues a session JWT and sets it as a secure cookie.
-- The user is redirected to `/welcome` (or the MCP client can handle the redirect and extract the session cookie).
-- All subsequent requests from the MCP client include the session cookie for authentication.
-- The `/auth/me` endpoint can be used by the MCP client to verify the user's identity and retrieve user info.
-- `/auth/logout` clears the session and logs the user out.
-
-This flow ensures that only authenticated users (via Google/Auth0) can access protected MCP tools and endpoints, and that the MCP client can securely manage user sessions.
-
-## Adding New Functionality
-
-### Adding New MCP Tools
-
-1. **Create your tool function** in `src/tools/` (create new modules as needed):
-   ```rust
-   // src/tools/my_module.rs
-   pub fn my_new_tool(input: &str) -> String {
-       // Your tool logic here
-       format!("Processed: {}", input)
-   }
-   ```
-
-2. **Register the tool** in `src/tools.rs`:
-   ```rust
-   pub static TOOL_REGISTRY: Lazy<Vec<Tool>> = Lazy::new(|| {
-       vec![
-           // ... existing tools ...
-           Tool {
-               name: "my_new_tool",
-               description: "Description of what this tool does.",
-           },
-       ]
-   });
-   ```
-
-3. **Add the handler** in `src/mcp.rs`:
-   ```rust
-   match req.method.as_str() {
-       // ... existing cases ...
-       "my_new_tool" => {
-           if let Some(params) = req.params {
-               if let Some(input) = params.get("input").and_then(|v| v.as_str()) {
-                   let result = crate::tools::my_module::my_new_tool(input);
-                   response.result = Some(serde_json::json!({"result": result}));
-               } else {
-                   response.error = Some(serde_json::json!({
-                       "code": -32602, 
-                       "message": "Missing 'input' param"
-                   }));
-               }
-           }
-       }
-   }
-   ```
-
-### Adding New Database Models
-
-1. **Create migration** in `migrations/`:
-   ```sql
-   -- migrations/0002_create_your_table.sql
-   CREATE TABLE IF NOT EXISTS your_table (
-       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-       name TEXT NOT NULL,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-   );
-   ```
-
-2. **Add model** in `src/auth/models.rs` or create new model files:
-   ```rust
-   #[derive(Debug, Serialize, Deserialize)]
-   pub struct YourModel {
-       pub id: uuid::Uuid,
-       pub name: String,
-       pub created_at: chrono::DateTime<chrono::Utc>,
-   }
-   ```
-
-### Adding New Authentication Routes
-
-Add new routes in `src/main.rs`:
 ```rust
-let router = Router::new()
-    // ... existing routes ...
-    .route("/your-route", get(your_handler))
-    .with_state((pool, secrets));
+// src/tools/my_tools.rs
+pub fn calculate_fibonacci(n: u32) -> u64 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => calculate_fibonacci(n - 1) + calculate_fibonacci(n - 2)
+    }
+}
 ```
 
-Create handlers in `src/auth/handlers.rs` that accept `AuthenticatedUser` for protected routes.
+2. **Register in the registry** (`src/registries.rs`):
 
-## Project Structure
+```rust
+Tool {
+    name: "fibonacci",
+    description: "Calculate Fibonacci number",
+},
+```
+
+3. **Add the handler** in `src/mcp.rs` (`handle_tool_call` function):
+
+```rust
+"fibonacci" => {
+    let n = arguments.get("n").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let result = crate::tools::my_tools::calculate_fibonacci(n);
+    Ok(serde_json::json!({
+        "content": [{
+            "type": "text",
+            "text": format!("Fibonacci({}) = {}", n, result)
+        }]
+    }))
+}
+```
+
+4. **Add the schema** in `get_tool_schema` function:
+
+```rust
+"fibonacci" => serde_json::json!({
+    "type": "object",
+    "properties": {
+        "n": {
+            "type": "integer",
+            "description": "The position in Fibonacci sequence",
+            "minimum": 0
+        }
+    },
+    "required": ["n"]
+}),
+```
+
+### Adding New Resources
+
+1. **Register the resource** (`src/registries.rs`):
+
+```rust
+Resource {
+    uri: "system://health",
+    name: "System Health",
+    description: "Current system health metrics",
+    mime_type: "application/json",
+},
+```
+
+2. **Add the handler** in `handle_resource_read` function (`src/mcp.rs`):
+
+```rust
+"system://health" => {
+    let health_data = serde_json::json!({
+        "status": "healthy",
+        "uptime": "2h 30m",
+        "memory_usage": "45%"
+    });
+    Ok(serde_json::json!({
+        "contents": [{
+            "uri": uri,
+            "mimeType": resource.mime_type,
+            "text": serde_json::to_string_pretty(&health_data).unwrap()
+        }]
+    }))
+}
+```
+
+### Adding New Prompts
+
+1. **Register the prompt** (`src/registries.rs`):
+
+```rust
+Prompt {
+    name: "write_tests",
+    description: "Generate unit tests for code",
+    arguments: vec![
+        PromptArgument {
+            name: "code",
+            description: "The code to test",
+            required: true,
+        },
+        PromptArgument {
+            name: "framework",
+            description: "Testing framework",
+            required: false,
+        },
+    ],
+},
+```
+
+2. **Add the handler** in `handle_prompt_get` function (`src/mcp.rs`):
+
+```rust
+"write_tests" => {
+    let code = arguments.and_then(|args| args.get("code"))
+        .and_then(|v| v.as_str()).unwrap_or("// No code provided");
+    let framework = arguments.and_then(|args| args.get("framework"))
+        .and_then(|v| v.as_str()).unwrap_or("jest");
+
+    Ok(serde_json::json!({
+        "messages": [{
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": format!("Write {} unit tests for this code:\n\n{}", framework, code)
+            }
+        }]
+    }))
+}
+```
+
+## 📁 Project Structure
 
 ```
 src/
 ├── main.rs              # Application entry point and routing
-├── auth/
-│   ├── mod.rs           # Auth module exports
+├── auth/                # Authentication system
+│   ├── mod.rs           # Module exports
 │   ├── handlers.rs      # OAuth and session handlers
-│   ├── middleware.rs    # Authentication middleware
+│   ├── middleware.rs    # Authentication middleware and helpers
 │   └── models.rs        # User and auth data models
 ├── database.rs          # Database initialization and migrations
 ├── mcp.rs              # MCP JSON-RPC protocol implementation
-└── tools/              # MCP tool implementations
-    ├── mod.rs          # Tool registry and exports
+├── registries.rs        # Central registries for tools, resources, and prompts
+└── tools/              # Tool implementations
+    ├── mod.rs          # Tool module exports
     ├── ai.rs           # OpenAI integration tools
     ├── db.rs           # Database query tools
     ├── text.rs         # Text processing utilities
@@ -352,7 +341,78 @@ src/
 migrations/             # Database migration files
 ```
 
-## Environment Variables
+## 🔐 Security Features
+
+- **OAuth 2.1 Flow**: Industry-standard authentication
+- **JWT Sessions**: Secure, stateless session management
+- **Method Protection**: All tools/resources require authentication
+- **HTTPS Ready**: Built for secure production deployment
+- **Input Validation**: Comprehensive parameter validation
+- **Error Handling**: Safe error responses without information leakage
+
+## 🧪 Example MCP Requests
+
+### Initialize Connection (Public)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": {"name": "test-client", "version": "1.0.0"}
+  },
+  "id": 1
+}
+```
+
+### List Tools (Requires Auth)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/list",
+  "id": 2
+}
+```
+
+### Call a Tool (Requires Auth)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "text_length",
+    "arguments": {"text": "Hello, world!"}
+  },
+  "id": 3
+}
+```
+
+### Read a Resource (Requires Auth)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "resources/read",
+  "params": {"uri": "user://stats"},
+  "id": 4
+}
+```
+
+## 🌟 Why This Template?
+
+### ✅ MCP Compliant
+- Full JSON-RPC 2.0 support
+- Complete capability negotiation
+- Proper authentication flow
+- Standard error codes
+
+### ✅ Cloud Native
+- One-command deployment to Shuttle
+- Managed PostgreSQL database
+- Environment-based configuration
+- Production monitoring ready
+
+## 🔧 Environment Variables
 
 Required in `Secrets.toml`:
 
@@ -370,23 +430,24 @@ SESSION_JWT_SECRET = 'your-32-char-minimum-secret-key'
 OPENAI_API_KEY = 'sk-your-openai-api-key'
 ```
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test locally with `cargo shuttle run`
-5. Deploy and test in production
-6. Submit a pull request
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and test locally
+4. Commit your changes: `git commit -m 'Add amazing feature'`
+5. Push to the branch: `git push origin feature/amazing-feature`
+6. Open a Pull Request
 
-## License
+## 📚 Learn More
 
-This template is provided under the MIT License. See LICENSE for details.
-
-## Resources
-
+- [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
 - [Shuttle Documentation](https://docs.shuttle.rs/)
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
 - [Auth0 Documentation](https://auth0.com/docs)
 - [Axum Web Framework](https://docs.rs/axum/)
-- [OpenAI API](https://platform.openai.com/docs)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

@@ -1,5 +1,5 @@
 use crate::auth::middleware::extract_authenticated_user_for_mcp;
-use crate::tools::TOOL_REGISTRY;
+use crate::registries::{PROMPT_REGISTRY, RESOURCE_REGISTRY, TOOL_REGISTRY};
 use axum::{
     extract::{Json, State},
     http::{HeaderMap, StatusCode},
@@ -195,12 +195,15 @@ pub async fn mcp_handler(
         }
         "resources/list" => {
             info!("Handling resources/list request (authenticated)");
-            let resources = vec![Resource {
-                uri: "user://stats".to_string(),
-                name: "User Statistics".to_string(),
-                description: Some("Current user statistics from the database".to_string()),
-                mime_type: Some("application/json".to_string()),
-            }];
+            let resources: Vec<Resource> = RESOURCE_REGISTRY
+                .iter()
+                .map(|resource| Resource {
+                    uri: resource.uri.to_string(),
+                    name: resource.name.to_string(),
+                    description: Some(resource.description.to_string()),
+                    mime_type: Some(resource.mime_type.to_string()),
+                })
+                .collect();
             response.result = Some(serde_json::json!({
                 "resources": resources
             }));
@@ -228,33 +231,24 @@ pub async fn mcp_handler(
         }
         "prompts/list" => {
             info!("Handling prompts/list request (authenticated)");
-            let prompts = vec![
-                Prompt {
-                    name: "code_review".to_string(),
-                    description: Some("Generate a code review prompt".to_string()),
-                    arguments: Some(vec![
-                        PromptArgument {
-                            name: "code".to_string(),
-                            description: Some("The code to review".to_string()),
-                            required: Some(true),
-                        },
-                        PromptArgument {
-                            name: "language".to_string(),
-                            description: Some("Programming language".to_string()),
-                            required: Some(false),
-                        },
-                    ]),
-                },
-                Prompt {
-                    name: "explain_error".to_string(),
-                    description: Some("Generate a prompt to explain an error".to_string()),
-                    arguments: Some(vec![PromptArgument {
-                        name: "error".to_string(),
-                        description: Some("The error message".to_string()),
-                        required: Some(true),
-                    }]),
-                },
-            ];
+            let prompts: Vec<Prompt> = PROMPT_REGISTRY
+                .iter()
+                .map(|prompt| Prompt {
+                    name: prompt.name.to_string(),
+                    description: Some(prompt.description.to_string()),
+                    arguments: Some(
+                        prompt
+                            .arguments
+                            .iter()
+                            .map(|arg| PromptArgument {
+                                name: arg.name.to_string(),
+                                description: Some(arg.description.to_string()),
+                                required: Some(arg.required),
+                            })
+                            .collect(),
+                    ),
+                })
+                .collect();
             response.result = Some(serde_json::json!({
                 "prompts": prompts
             }));
@@ -495,12 +489,23 @@ async fn handle_tool_call(
 }
 
 async fn handle_resource_read(uri: &str, pool: &sqlx::PgPool) -> Result<Value, Value> {
+    // First check if the resource URI exists in our registry
+    let resource = RESOURCE_REGISTRY
+        .iter()
+        .find(|r| r.uri == uri)
+        .ok_or_else(|| {
+            serde_json::json!({
+                "code": -32001,
+                "message": "Resource not found"
+            })
+        })?;
+
     match uri {
         "user://stats" => match crate::tools::db::user_stats(pool).await {
             Ok(stats) => Ok(serde_json::json!({
                 "contents": [{
                     "uri": uri,
-                    "mimeType": "application/json",
+                    "mimeType": resource.mime_type,
                     "text": serde_json::to_string_pretty(&stats).unwrap()
                 }]
             })),
@@ -508,18 +513,29 @@ async fn handle_resource_read(uri: &str, pool: &sqlx::PgPool) -> Result<Value, V
                 error!("Failed to read user stats resource: {}", e);
                 Err(serde_json::json!({
                     "code": -32001,
-                    "message": "Resource not found"
+                    "message": "Failed to read resource"
                 }))
             }
         },
         _ => Err(serde_json::json!({
             "code": -32001,
-            "message": "Resource not found"
+            "message": "Resource handler not implemented"
         })),
     }
 }
 
 async fn handle_prompt_get(name: &str, arguments: Option<&Value>) -> Result<Value, Value> {
+    // First check if the prompt exists in our registry
+    let _prompt = PROMPT_REGISTRY
+        .iter()
+        .find(|p| p.name == name)
+        .ok_or_else(|| {
+            serde_json::json!({
+                "code": -32003,
+                "message": "Prompt not found"
+            })
+        })?;
+
     match name {
         "code_review" => {
             let code = arguments
@@ -560,7 +576,7 @@ async fn handle_prompt_get(name: &str, arguments: Option<&Value>) -> Result<Valu
         }
         _ => Err(serde_json::json!({
             "code": -32003,
-            "message": "Prompt not found"
+            "message": "Prompt handler not implemented"
         })),
     }
 }
