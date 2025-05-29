@@ -61,9 +61,10 @@ cd mcp-server
 
 ### 2. Configure Auth0
 
-1. Create a new **Application** (Regular Web App) in Auth0
-2. Enable **Google Social Connection** 
-3. Note your domain, client ID, and client secret
+1. Go to Applications and click "Create Application"
+1. Choose "Regular Web Application"
+2. Go to connections and enable **Google Social Connection**
+3. Note your domain, client ID, and client secret from the application's settings
 
 ### 3. Create Secrets
 
@@ -87,11 +88,33 @@ shuttle run
 
 ### 5. Test Your Server
 
-```bash
-# Test authentication
-curl http://localhost:8000/auth/login
+The easiest way to test your MCP server is using the official **MCP Inspector** - a visual testing tool designed specifically for MCP development.
 
-# Test MCP endpoint (initialize is public)
+#### Using MCP Inspector (Recommended)
+
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provides a complete testing interface with no installation required:
+
+```bash
+# Test the Shuttle server directly
+npx @modelcontextprotocol/inspector shuttle run
+```
+- Open MCP Inspector in the Browser
+- Choose Streamable HTTP as the transport type.
+- Set URL as "http://localhost:8000/mcp"
+- Click Connect
+
+The Inspector provides:
+- **Visual Interface**: Interactive UI for testing tools, resources, and prompts
+- **Authentication Support**: Built-in bearer token authentication for testing protected methods
+- **Real-time Debugging**: Monitor JSON-RPC messages and server responses
+- **Export Configuration**: Generate `mcp.json` files for client integration
+
+#### Basic Testing with curl
+
+For quick verification, you can test public endpoints:
+
+```bash
+# Test MCP endpoint (initialize is public - no auth required)
 curl -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
   -d '{
@@ -104,7 +127,12 @@ curl -X POST http://localhost:8000/mcp \
     },
     "id": 1
   }'
+
+# Test authentication flow (will redirect to Auth0)
+curl -I http://localhost:8000/auth/login
 ```
+
+> **Note**: Testing protected MCP methods (tools, resources, prompts) requires authentication, which is much easier to handle with the MCP Inspector's built-in auth support.
 
 ## 🌐 Deploy to Production
 

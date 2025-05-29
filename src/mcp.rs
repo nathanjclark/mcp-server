@@ -2,7 +2,7 @@ use crate::auth::middleware::extract_authenticated_user_for_mcp;
 use crate::registries::{PROMPT_REGISTRY, RESOURCE_REGISTRY, TOOL_REGISTRY};
 use axum::{
     extract::{Json, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
@@ -127,13 +127,28 @@ pub async fn mcp_handler(
             }
             Err(error_json) => {
                 error!("Authentication failed for method: {}", req.method);
-                return axum::Json(JsonRpcResponse {
+
+                // Return proper OAuth 2.1 error response with WWW-Authenticate header
+                let mut response = axum::Json(JsonRpcResponse {
                     jsonrpc: "2.0".to_string(),
                     result: None,
                     error: Some(error_json),
                     id: req.id,
                 })
                 .into_response();
+
+                // Add WWW-Authenticate header as required by MCP spec
+                let www_auth_value = HeaderValue::from_static(
+                    r#"Bearer realm="mcp-server", error="invalid_token", error_description="Authentication required""#,
+                );
+                response
+                    .headers_mut()
+                    .insert("WWW-Authenticate", www_auth_value);
+
+                // Set status to 401 Unauthorized
+                *response.status_mut() = StatusCode::UNAUTHORIZED;
+
+                return response;
             }
         }
     } else {

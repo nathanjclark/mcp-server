@@ -1,14 +1,11 @@
 use crate::auth::middleware::AuthenticatedUser;
+use crate::auth::models::OAuthAuthorizationCode;
 use axum::{
     extract::{Query, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{header, HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
 };
-use chrono::{Duration, Utc};
-use jsonwebtoken::{
-    decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, Header as JwtHeader,
-    TokenData, Validation,
-};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, TokenData, Validation};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -20,7 +17,7 @@ use urlencoding;
 #[derive(Debug, Deserialize)]
 pub struct AuthCallbackQuery {
     pub code: String,
-    pub _state: Option<String>,
+    pub state: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -62,6 +59,7 @@ pub async fn login(State((_pool, secrets)): State<(PgPool, SecretStore)>) -> imp
 pub async fn callback(
     State((pool, secrets)): State<(PgPool, SecretStore)>,
     Query(query): Query<AuthCallbackQuery>,
+    _headers: HeaderMap,
 ) -> impl IntoResponse {
     let auth0_domain = secrets
         .get("AUTH0_DOMAIN")
@@ -163,48 +161,43 @@ pub async fn callback(
     .execute(&pool)
     .await;
 
-    // Issue a session JWT
-    #[derive(Serialize, Deserialize)]
-    struct SessionClaims {
-        sub: String,
-        email: String,
-        exp: usize,
+    // Always try to bind the user to the code and redirect to the original redirect_uri
+    if let Some(oauth_code) = query.state.clone() {
+        // Update the pending code in the DB to set user_id
+        let _ = sqlx::query("UPDATE oauth_authorization_codes SET user_id = $1 WHERE code = $2")
+            .bind(&user_id)
+            .bind(&oauth_code)
+            .execute(&pool)
+            .await;
+
+        // Look up the redirect_uri for this code
+        if let Ok(Some(row)) = sqlx::query_as::<_, OAuthAuthorizationCode>(
+            "SELECT * FROM oauth_authorization_codes WHERE code = $1",
+        )
+        .bind(&oauth_code)
+        .fetch_optional(&pool)
+        .await
+        {
+            if let Some(redirect_uri) = row.redirect_uri {
+                // Redirect to client with code
+                let uri = format!("{}?code={}", redirect_uri, oauth_code);
+                return Redirect::temporary(&uri).into_response();
+            }
+        }
+        // If we can't find a redirect_uri, return an error
+        return (
+            StatusCode::BAD_REQUEST,
+            "OAuth flow error: missing or invalid redirect_uri for code",
+        )
+            .into_response();
     }
-    let jwt_secret = secrets
-        .get("SESSION_JWT_SECRET")
-        .unwrap_or("SESSION_SECRET".to_string());
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(24))
-        .expect("valid timestamp")
-        .timestamp() as usize;
-    let session_claims = SessionClaims {
-        sub: user_id.clone(),
-        email: email.clone(),
-        exp: expiration,
-    };
-    let session_jwt = encode(
-        &JwtHeader::default(),
-        &session_claims,
-        &EncodingKey::from_secret(jwt_secret.as_ref()),
+
+    // If not an OAuth flow, return an error
+    (
+        StatusCode::BAD_REQUEST,
+        "OAuth flow error: missing state (code) in callback",
     )
-    .unwrap();
-
-    // Set JWT as a secure HttpOnly cookie
-    let cookie = format!(
-        "session={}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400",
-        session_jwt
-    );
-    let mut headers = HeaderMap::new();
-    headers.insert(header::SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
-
-    // Redirect to a welcome page or return a success message
-    let response = Response::builder()
-        .status(StatusCode::FOUND)
-        .header(header::SET_COOKIE, cookie)
-        .header(header::LOCATION, "/welcome")
-        .body(axum::body::Body::empty())
-        .unwrap();
-    response
+        .into_response()
 }
 
 pub async fn welcome() -> Html<&'static str> {
