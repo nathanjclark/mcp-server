@@ -145,14 +145,14 @@ shuttle login
 ### 2. Update Auth0 Settings
 
 In your Auth0 application:
-- **Allowed Callback URLs**: `https://your-mcp-server.shuttleapp.rs/auth/callback`
-- **Allowed Logout URLs**: `https://your-mcp-server.shuttleapp.rs/`
+- **Allowed Callback URLs**: `https://your-mcp-server.shuttleapp.dev/auth/callback`
+- **Allowed Logout URLs**: `https://your-mcp-server.shuttleapp.dev/`
 
 ### 3. Update Production Secrets
 
 ```toml
 # Update Secrets.toml
-AUTH0_CALLBACK_URL = 'https://your-mcp-server.shuttleapp.rs/auth/callback'
+AUTH0_CALLBACK_URL = 'https://your-mcp-server.shuttleapp.dev/auth/callback'
 # Keep other secrets the same
 ```
 
@@ -165,11 +165,32 @@ shuttle deploy
 ## 🔌 API Endpoints
 
 ### Authentication
-- `GET /auth/login` - Start OAuth flow
-- `GET /auth/callback` - OAuth callback 
-- `GET /auth/me` - Get current user (authenticated)
-- `GET /auth/logout` - Logout and clear session
-- `GET /welcome` - Welcome page after login
+### OAuth 2.1 Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/.well-known/oauth-authorization-server` | GET | OAuth server metadata (RFC8414) |
+| `/authorize` | GET | Authorization endpoint with PKCE support |
+| `/token` | POST | Token endpoint for access tokens |
+| `/register` | POST | Dynamic client registration (RFC7591) |
+
+### OAuth Flow
+
+1. Client registers using `/register` endpoint
+2. Client initiates auth flow via `/authorize` with PKCE
+3. User authenticates and authorizes
+4. Client exchanges code for token via `/token`
+5. Client uses access token for MCP requests
+
+### Session Authentication Endpoints
+
+These endpoints handle user session authentication (separate from OAuth client registration):
+
+- `GET /auth/login` - Start Auth0 login flow for user sessions
+- `GET /auth/callback` - Handle Auth0 callback and create user session
+- `GET /auth/me` - Get current authenticated user's session info
+- `GET /auth/logout` - Clear user session and logout from Auth0
+- `GET /welcome` - Landing page for authenticated users
 
 ### MCP Protocol
 - `POST /mcp` - Main MCP JSON-RPC 2.0 endpoint
@@ -369,15 +390,6 @@ src/
 migrations/             # Database migration files
 ```
 
-## 🔐 Security Features
-
-- **OAuth 2.1 Flow**: Industry-standard authentication
-- **JWT Sessions**: Secure, stateless session management
-- **Method Protection**: All tools/resources require authentication
-- **HTTPS Ready**: Built for secure production deployment
-- **Input Validation**: Comprehensive parameter validation
-- **Error Handling**: Safe error responses without information leakage
-
 ## 🧪 Example MCP Requests
 
 ### Initialize Connection (Public)
@@ -426,20 +438,6 @@ migrations/             # Database migration files
 }
 ```
 
-## 🌟 Why This Template?
-
-### ✅ MCP Compliant
-- Full JSON-RPC 2.0 support
-- Complete capability negotiation
-- Proper authentication flow
-- Standard error codes
-
-### ✅ Cloud Native
-- One-command deployment to Shuttle
-- Managed PostgreSQL database
-- Environment-based configuration
-- Production monitoring ready
-
 ## 🔧 Environment Variables
 
 Required in `Secrets.toml`:
@@ -457,15 +455,6 @@ SESSION_JWT_SECRET = 'your-32-char-minimum-secret-key'
 # Optional: AI Tools
 OPENAI_API_KEY = 'sk-your-openai-api-key'
 ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test locally
-4. Commit your changes: `git commit -m 'Add amazing feature'`
-5. Push to the branch: `git push origin feature/amazing-feature`
-6. Open a Pull Request
 
 ## 📚 Learn More
 
